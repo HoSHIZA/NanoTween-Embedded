@@ -139,12 +139,12 @@ namespace NanoTweenRootNamespace
         {
             ref var data = ref wrapper.Data;
             
-            if (data.FromGetter is Action<T>)
+            if (data.FromGetter != null)
             {
                 data.From = data.FromGetter.Invoke();
             }
 
-            if (data.ToGetter is Action<T>)
+            if (data.ToGetter != null)
             {
                 data.To = data.ToGetter.Invoke();
             }
