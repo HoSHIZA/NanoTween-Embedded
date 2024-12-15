@@ -89,8 +89,6 @@ namespace NanoTweenRootNamespace
         {
             var buffer = NanoTweenBuilderBuffer<T>.GetPooled();
             
-            buffer.Owner = NanoTweenUpdateComponent.GetOrCreate();
-            
             buffer.Data.From = from;
             buffer.Data.To = to;
             buffer.Data.Core.Duration = duration;
@@ -591,16 +589,17 @@ namespace NanoTweenRootNamespace
             {
                 Buffer.Data.Callback.InvokeStart(ref Buffer.Data);
             }
-
-            var owner = Buffer.Owner;
-            var coroutine = NanoTweenUpdate.StartTweenCoroutine(Buffer.Owner, Buffer.Data);
+            
+            var handle = !Buffer.Owner
+                ? NanoTweenUpdate.Run(Buffer.Data) 
+                : NanoTweenUpdate.RunAsCoroutine(Buffer.Owner, Buffer.Data);
             
             if (!Buffer.Preserve)
             {
                 Dispose();
             }
 
-            return new NanoTweenHandle(owner, coroutine);
+            return handle;
         }
         
         public void Dispose()

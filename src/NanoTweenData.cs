@@ -83,6 +83,25 @@ namespace NanoTweenRootNamespace
         public NLoopType LoopType;
         public bool AffectLoopsOnDuration;
         public int LoopCount;
+
+        private double? _totalDuration;
+        private double? _loopDuration;
+        
+        public double TotalDuration => _totalDuration ??= LoopCount > 0
+            ? AffectLoopsOnDuration
+                ? Duration * LoopCount 
+                : Duration
+            : double.PositiveInfinity;
+        
+        public double LoopDuration => _loopDuration ??= AffectLoopsOnDuration 
+            ? Duration 
+            : Duration / LoopCount;
+
+        public void ResetCalculatedDuration()
+        {
+            _totalDuration = null;
+            _loopDuration = null;
+        }
         
         public static readonly NanoTweenDataCore Default = new()
         {

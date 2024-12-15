@@ -23,40 +23,17 @@
 //   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 //   SOFTWARE.
 
-using JetBrains.Annotations;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
-namespace NanoTweenRootNamespace
+namespace NanoTweenRootNamespace.Extensions
 {
-    [PublicAPI]
-    internal struct NanoTweenHandle
+    internal static class NanoTweenDataExtensions
     {
-        public readonly int Id;
-        public readonly MonoBehaviour Owner;
-        public readonly Coroutine Routine;
-        
-        public bool RunsAsCoroutine => Routine != null && Owner != null;
-        public bool RunsAsUpdater => !RunsAsCoroutine && Id >= 0;
-        
-        public NanoTweenHandle(int id)
+        [MethodImpl(256)]
+        public static int CalculateCurrentLoopIndex(this NanoTweenDataCore data)
         {
-            Id = id;
-            Owner = null;
-            Routine = null;
+            return Mathf.FloorToInt((float)(data.Time / data.LoopDuration));
         }
-        
-        public NanoTweenHandle(MonoBehaviour owner, Coroutine routine)
-        {
-            Id = -1;
-            Owner = owner;
-            Routine = routine;
-        }
-
-        public bool IsValid()
-        {
-            return RunsAsUpdater || RunsAsCoroutine;
-        }
-
-        public static readonly NanoTweenHandle Invalid = new(-1);
     }
 }

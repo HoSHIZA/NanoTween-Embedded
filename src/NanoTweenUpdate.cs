@@ -25,6 +25,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using NanoTweenRootNamespace.Extensions;
 using UnityEngine;
@@ -36,18 +37,38 @@ namespace NanoTweenRootNamespace
         private class DataWrapper<T> 
         {
             public NanoTweenData<T> Data;
-        }
-        
-        public static Coroutine StartTweenCoroutine<T>(MonoBehaviour owner, in NanoTweenData<T> data)
-        {
-            var wrapper = new DataWrapper<T>
+
+            public DataWrapper(NanoTweenData<T> data)
             {
-                Data = data,
-            };
-            
-            return owner.StartCoroutine(UpdateEnumerator(wrapper));
+                Data = data;
+            }
         }
         
+        public static NanoTweenHandle Run<T>(in NanoTweenData<T> data)
+        {
+            var handle = RunAsCoroutine<T>(NanoTweenUpdateComponent.GetOrCreate(), data);
+            
+            return handle;
+        }
+
+        public static NanoTweenHandle RunAsCoroutine<T>(MonoBehaviour owner, in NanoTweenData<T> data)
+        {
+            var wrapper = new DataWrapper<T>(data);
+            
+            if (!owner.gameObject.activeInHierarchy)
+            { 
+                var isLastLoopReversed = data.Core.LoopType is NLoopType.Yoyo && data.Core.LoopCount % 2 == 1;
+                
+                CompleteTween(wrapper, isLastLoopReversed);
+                
+                return NanoTweenHandle.Invalid;
+            }
+            
+            var coroutine = owner.StartCoroutine(UpdateEnumerator(wrapper));
+            
+            return new NanoTweenHandle(owner, coroutine);
+        }
+
         private static IEnumerator UpdateEnumerator<T>(DataWrapper<T> wrapper)
         {
             while (true)
@@ -98,23 +119,23 @@ namespace NanoTweenRootNamespace
                 return;
             }
             
-            var totalDuration = data.Core.LoopCount > 0
-                ? data.Core.AffectLoopsOnDuration
-                    ? data.Core.Duration * data.Core.LoopCount 
-                    : data.Core.Duration
-                : double.PositiveInfinity;
+            var currentLoop = data.Core.CalculateCurrentLoopIndex();
+            var isReverseLoop = data.Core.LoopType is NLoopType.Yoyo && currentLoop % 2 == 1;
             
-            var loopDuration = data.Core.AffectLoopsOnDuration
-                ? data.Core.Duration
-                : data.Core.Duration / data.Core.LoopCount;
-            
-            if (data.Core.Time >= totalDuration)
+            if (data.Core.Time >= data.Core.TotalDuration)
             {
-                CompleteTween(wrapper, totalDuration, loopDuration);
+                CompleteTween(wrapper, isReverseLoop);
+                
                 return;
             }
             
-            UpdateTweenValue(wrapper, loopDuration);
+            var currentLoopTime = data.Core.Time % data.Core.LoopDuration;
+            
+            var t = !isReverseLoop
+                ? (float)(currentLoopTime / data.Core.LoopDuration)
+                : 1f - (float)(currentLoopTime / data.Core.LoopDuration);
+            
+            data.Callback.InvokeUpdate(ref data, t);
         }
 
         [MethodImpl(256)]
@@ -152,39 +173,28 @@ namespace NanoTweenRootNamespace
             data.Core.State = NTweenState.Running;
             data.Callback.OnStartDelayedAction?.Invoke();
             
-            if (data.Core.DelayMode is NDelayMode.AffectOnDuration)
+            if (data.Core is { Delay: > 0, DelayMode: NDelayMode.AffectOnDuration })
             {
                 data.Core.Time -= data.Core.Delay;
             }
         }
 
         [MethodImpl(256)]
-        private static void UpdateTweenValue<T>(DataWrapper<T> wrapper, in float duration)
+        private static void CompleteTween<T>(DataWrapper<T> wrapper, bool isReverseLoop)
         {
             ref var data = ref wrapper.Data;
             
-            var currentLoop = Mathf.FloorToInt((float)(data.Core.Time / duration));
-            var timeInCurrentLoop = data.Core.Time % duration;
+            data.Core.Time = data.Core.TotalDuration;
 
-            var t = (float)(timeInCurrentLoop / duration);
-
-            if (data.Core.LoopType is NLoopType.Yoyo && currentLoop % 2 == 1)
+            if (isReverseLoop)
             {
-                t = 1 - t;
+                data.Callback.InvokeStart(ref data);
+            }
+            else
+            {
+                data.Callback.InvokeEnd(ref data);
             }
             
-            data.Callback.InvokeUpdate(ref data, t);
-        }
-
-        [MethodImpl(256)]
-        private static void CompleteTween<T>(DataWrapper<T> wrapper, double totalDuration, in float duration)
-        {
-            ref var data = ref wrapper.Data;
-            
-            data.Core.Time = totalDuration;
-
-            UpdateTweenValue(wrapper, duration);
-
             data.Core.State = NTweenState.Completed;
             data.Callback.OnCompleteAction?.Invoke();
         }
