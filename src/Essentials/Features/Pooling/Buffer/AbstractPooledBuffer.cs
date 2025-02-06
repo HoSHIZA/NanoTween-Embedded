@@ -1,3 +1,5 @@
+using System;
+
 namespace NanoTweenRootNamespace.Pooling.Buffer
 {
     /// <summary>
@@ -19,20 +21,27 @@ namespace NanoTweenRootNamespace.Pooling.Buffer
         /// Buffer version. 
         /// </summary>
         public ushort Revision;
-        
+
         /// <summary>
         /// Takes a buffer from the pool of available buffers.
         /// </summary>
         public static T GetPooled()
         {
-            if (PoolRoot == null) return new T();
-            
-            var result = PoolRoot;
-            PoolRoot = PoolRoot.Next;
-            result.Next = null;
+            T result;
+            if (PoolRoot == null)
+            {
+                result = new T();
+            }
+            else
+            {
+                result = PoolRoot;
+                PoolRoot = PoolRoot.Next;
+                result.Next = null;
+            }
             
             result.Reset();
-            
+            result.Validate(result, "The buffer has been received more than once or is in an incorrect state.");
+
             return result;
         }
         
@@ -43,11 +52,20 @@ namespace NanoTweenRootNamespace.Pooling.Buffer
         {
             buffer.Revision++;
             buffer.Reset();
+            buffer.Validate(buffer, "Attempting to return a buffer in an invalid state to the pool.");
             
             if (buffer.Revision != ushort.MaxValue)
             {
                 buffer.Next = PoolRoot;
                 PoolRoot = buffer;
+            }
+        }
+        
+        protected void Validate(T buffer, string errorMessage)
+        {
+            if (buffer.Next != null)
+            {
+                throw new InvalidOperationException(errorMessage);
             }
         }
         
